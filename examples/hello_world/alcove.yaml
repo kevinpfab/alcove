@@ -1,0 +1,9 @@
+---
+common_less: style/common
+js: js
+locale: locale
+output: output
+style: style
+test_output: output/test
+widget_tests: test/widgets
+widgets: widgets

@@ -1,0 +1,151 @@
+#!/usr/bin/env ruby
+
+$:.unshift File.join(File.dirname(__FILE__), *%w[.. lib])
+
+unless $0.end_with?('rake')
+    cmd = "rake -f #{__FILE__} #{ARGV.join(' ')}"
+    IO.popen(cmd){|f| $stderr.print f.read.gsub("rake", "alcove"); $stderr.flush}
+    exit
+end
+
+basedir = Dir.pwd()
+require File.join(File.dirname(__FILE__), '..', 'lib', 'alcove.rb')
+builder = Alcove::Builder.new(basedir)
+
+task :default => :help
+
+# {{{ help
+desc "Print help"
+task :help do |t|
+    $stderr.puts <<HELP
+Alcove is a unified build tool for object-oriented UI components for single-page web-apps
+
+This script is a rakefile!  All rake options should function, including -T to list tasks
+
+To create a new project, run 'alcove new projectname'
+
+Configuration is read from 'alcove.yaml'
+
+HELP
+end
+
+# }}}
+# {{{ config
+desc "Write a default config file.  Current config file will be merged with default values"
+task :config do
+    create_config(basedir)
+    $stderr.puts "Done."
+end
+
+# }}}
+# {{{ clean
+desc "Clean the output directory"
+task :clean do
+    $stderr.print "Cleaning..."
+    builder.clean
+    $stderr.puts " Done"
+end
+
+# }}}
+# {{{ new
+desc "Initialize a new project. Includes a default configuration file."
+task :new do
+    name = ARGV.last
+    builder.new_app(name)
+    create_config(File.join(basedir, name))
+    $stderr.puts "Successfully created #{name}!"
+    task name.to_sym do ; end
+end
+
+# }}}
+# {{{ dependencies
+desc "(Re) Install Alcove dependencies included in package. Also available online."
+task :dependencies do
+    builder.install_dependencies
+    $stderr.puts "Dependencies successfully installed."
+end
+
+# }}}
+# {{{ examples
+desc "Copies example projects to current directory. Lists all example projects if no project is specified."
+task :examples, :project do |t, args|
+    project = args[:project]
+    examples_dir = File.join(File.dirname(__FILE__), '..', 'examples')
+    unless project.nil?
+        dir = File.join(examples_dir, project)
+        if File.exists?(dir)
+            new_dir = File.join(basedir, project)
+            FileUtils.cp_r(dir, new_dir)
+            $stderr.puts "Copied example project " + project
+        else
+            $stderr.puts "Example project does not exists."
+        end
+    else
+        $stderr.puts "Available example projects:"
+        Dir.foreach(examples_dir) do |dir|
+            next if dir == '.' or dir == '..'
+            $stderr.puts "  " + dir
+        end
+    end
+end
+
+# }}}
+# {{{ build
+desc "Build the project. Pass an optional argument [true] to also minify the project."
+task :build, :minify do |t, args|
+    mini = args[:minify] == true || args[:minify] == "true"
+    $stderr.print "Building#{" and minifying" if mini}..."
+    builder.build(mini)
+    $stderr.puts " Done"
+end
+
+# }}}
+# {{{ test
+desc "Launch a test page for a specific widget"
+task :test, :widget, :port do |t, args|
+    require 'webrick' rescue raise("Please install the 'webrick' gem to host widget tests")
+    include WEBrick
+
+    raise("Please provide a widget name") unless args[:widget]
+
+    port = args[:port] || 4000
+    $stderr.print "Building tests for #{args[:widget]}"
+    path = builder.build_test(args[:widget])
+    $stderr.puts "Done... Launching webserver on port #{port}"
+
+    mime_types = WEBrick::HTTPUtils::DefaultMimeTypes
+    mime_types.store 'js', 'application/javascript'
+
+    s = HTTPServer.new(
+        :Port      => port,
+        :MimeTypes => mime_types
+    )
+    s.mount('/', HTTPServlet::FileHandler, path)
+    t = Thread.new {
+        s.start
+    }
+
+    trap("INT") { s.shutdown }
+    t.join()
+end
+
+# }}}
+
+# Helper Methods
+# {{{ create_config
+def create_config(dir)
+    config_file = File.join(dir, 'alcove.yaml')
+    config = {}
+    if File.exists?(config_file)
+        config = YAML.load_file(config_file)
+        config = config.inject({}){|memo,(k,v)| memo[k.to_sym] = v; memo}
+    end
+    current = Alcove::Builder::DEFAULTS.merge(config)
+    $stderr.puts "Writing config file to #{config_file}\n"
+    current  = current.inject({}){|memo,(k,v)| memo[k.to_s] = v; memo}
+    File.open(config_file, 'w') do |f| f.puts(YAML.dump(current)) end
+end
+
+# }}}
+ 
+

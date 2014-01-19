@@ -1,0 +1,18 @@
+<html>
+    <head>
+        <link rel='stylesheet' type='text/css' href='$$CSSFILE$$'/>
+    </head>
+    <body>
+    </body>
+    <script src='$$JSFILE$$'></script>
+    <script>
+        $(function() {
+            $$BODY$$
+            if (!$$sut) {
+                document.write("$$sut not defined");
+            } else {
+                $($$sut).appendTo($('body'));
+            }
+        });
+    </script>
+</html>

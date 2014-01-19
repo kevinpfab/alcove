@@ -1,0 +1,22 @@
+
+.box-shadow(0 0 10px grey);
+.rounded(5px);
+border: 1px solid black;
+line-height: 40px;
+margin: 0 auto;
+overflow-y:auto;
+text-align: center;
+width: 400px;
+word-wrap: break-word;
+padding: 10px;
+
+span {
+    font-size: 200%;
+    padding-right: 10px;
+}
+
+a {
+    &:hover {
+        text-decoration: none;
+    }
+}
